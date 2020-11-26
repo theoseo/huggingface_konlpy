@@ -1,1 +1,1 @@
-from .pretrained_tokenizers import KoNLPyPretokBertTokenizer, KoNLPyBertTokenizer
+from .pretrained_tokenizers import KoNLPyPretokBertTokenizer, KoNLPyBertTokenizer, KoNLPyT5Tokenizer
