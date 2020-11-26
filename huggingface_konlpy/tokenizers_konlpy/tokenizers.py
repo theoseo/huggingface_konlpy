@@ -165,6 +165,49 @@ class KoNLPyBertWordPieceTrainer:
                 f.write(f'{subword}\n')
         print(f'[{vocab_file}]')
 
+class KoNLPyT5WordPieceTrainer:
+    def __init__(self, konlpy_tagger, wordpieces_prefix="##", use_tag=False):
+        konlpy_wordpiece = KoNLPyWordPieceTokenizer(
+            konlpy_tagger,
+            wordpieces_prefix,
+            use_tag
+        )
+        self.tokenizer = konlpy_wordpiece
+
+    def tokenize(self, sent):
+        split_tokens = []
+        for eojeol in sent.split():
+            split_tokens += self.tokenizer.tokenize(eojeol)
+        return split_tokens
+
+    def train(
+        self,
+        files: Union[str, List[str]],
+        vocab_size: int = 30000,
+        min_frequency: int = 2,
+        limit_alphabet: int = 1000,
+        initial_alphabet: List[str] = [],
+        special_tokens: List[str] = ["<pad>", "</s>", "<unk>"],
+        show_progress: bool = True,
+    ):
+        if isinstance(files, str):
+            files = [files]
+        alphabets = initialize_alphabet(files, limit_alphabet, initial_alphabet, special_tokens, show_progress)
+        self.vocab = train_vocab(files, vocab_size, min_frequency, show_progress, alphabets, self.tokenizer.tokenize)
+
+    def save_model(self, directory: str, name: Optional[str] = None):
+        if name is None:
+            name = 'vocab.txt'
+        else:
+            name = f'{name}-vocab.txt'
+        directory = os.path.abspath(directory)
+        if not os.path.exists(directory):
+            os.makedirs(directory)
+        vocab_file = f'{directory}/{name}'
+        with open(vocab_file, 'w', encoding='utf-8') as f:
+            for subword in self.vocab:
+                f.write(f'{subword}\n')
+        print(f'[{vocab_file}]')
 
 def initialize_alphabet(files, limit_alphabet, initial_alphabet, special_tokens, show_progress):
     counter = Counter()
