@@ -1,4 +1,5 @@
-from transformers import BertTokenizer
+from transformers import BertTokenizer, PreTrainedTokenizer
+import collections
 
 
 class KoNLPyPretokBertTokenizer(BertTokenizer):
@@ -132,3 +133,69 @@ class KoNLPyBertTokenizer(BertTokenizer):
             else:
                 split_tokens += self.konlpy_wordpiece.token_to_alphabets(token)
         return split_tokens
+
+def load_vocab(vocab_file):
+    """Loads a vocabulary file into a dictionary."""
+    vocab = collections.OrderedDict()
+    with open(vocab_file, "r", encoding="utf-8") as reader:
+        tokens = reader.readlines()
+    for index, token in enumerate(tokens):
+        token = token.rstrip("\n")
+        vocab[token] = index
+    return vocab
+
+class KoNLPyT5Tokenizer(PreTrainedTokenizer):
+
+    def __init__(
+        self,
+        konlpy_wordpiece,
+        vocab_file,
+        eos_token="</s>",
+        unk_token="<unk>",
+        pad_token="<pad>",
+        extra_ids=100,
+        additional_special_tokens=None,
+        **kwargs
+    ):
+        super().__init__(
+            vocab_file=vocab_file,
+            eos_token=eos_token,
+            unk_token=unk_token,
+            pad_token=pad_token,
+            extra_ids=extra_ids,
+            additional_special_tokens=additional_special_tokens
+        )
+        self.vocab = load_vocab(vocab_file)
+        self.ids_to_tokens = collections.OrderedDict([(ids, tok) for tok, ids in self.vocab.items()])
+        self.konlpy_wordpiece = konlpy_wordpiece
+
+
+    @property
+    def vocab_size(self):
+        return len(self.vocab)
+
+    def get_vocab(self):
+        return dict(self.vocab, **self.added_tokens_encoder)
+
+    def _tokenize(self, text):
+        base_tokens = self.konlpy_wordpiece.tokenize(text)
+        split_tokens = []
+        for token in base_tokens:
+            if token in self.vocab:
+                split_tokens.append(token)
+            else:
+                split_tokens += self.konlpy_wordpiece.token_to_alphabets(token)
+        return split_tokens
+
+    def _convert_token_to_id(self, token):
+        """ Converts a token (str) in an id using the vocab. """
+        return self.vocab.get(token, self.vocab.get(self.unk_token))
+
+    def _convert_id_to_token(self, index):
+        """Converts an index (integer) in a token (str) using the vocab."""
+        return self.ids_to_tokens.get(index, self.unk_token)
+
+    def convert_tokens_to_string(self, tokens):
+        """ Converts a sequence of tokens (string) in a single string. """
+        out_string = " ".join(tokens).replace(" ##", "").strip()
+        return out_string
