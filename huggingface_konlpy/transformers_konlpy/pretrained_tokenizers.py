@@ -178,16 +178,15 @@ class KoNLPyT5Tokenizer(PreTrainedTokenizer):
             additional_special_tokens=additional_special_tokens
         )
         self.vocab = load_vocab(vocab_file)
+        self._extra_ids = extra_ids
         self.ids_to_tokens = collections.OrderedDict([(ids, tok) for tok, ids in self.vocab.items()])
         self.konlpy_wordpiece = konlpy_wordpiece
 
 
     @property
     def vocab_size(self):
-        return len(self.vocab)
+        return len(self.vocab) + self._extra_ids
 
-    def get_vocab(self):
-        return dict(self.vocab, **self.added_tokens_encoder)
 
     def _tokenize(self, text):
         base_tokens = self.konlpy_wordpiece.tokenize(text)
@@ -201,11 +200,19 @@ class KoNLPyT5Tokenizer(PreTrainedTokenizer):
 
     def _convert_token_to_id(self, token):
         """ Converts a token (str) in an id using the vocab. """
-        return self.vocab.get(token, self.vocab.get(self.unk_token))
+        if token.startswith("<extra_id_"):
+            match = re.match(r"<extra_id_(\d+)>", token)
+            num = int(match.group(1))
+            return self.vocab_size - num - 1        
+        return self.vocab.get(token)
 
     def _convert_id_to_token(self, index):
         """Converts an index (integer) in a token (str) using the vocab."""
-        return self.ids_to_tokens.get(index, self.unk_token)
+        if index < len(self.vocab):
+            token = self.ids_to_tokens.get(index)
+        else:
+            token = "<extra_id_{}>".format(self.vocab_size - 1 - index)        
+        return token
 
     def convert_tokens_to_string(self, tokens):
         """ Converts a sequence of tokens (string) in a single string. """
